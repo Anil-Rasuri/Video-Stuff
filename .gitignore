@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# downloaded at runtime (python -m captioner fonts)
+fonts/*
+!fonts/.gitkeep
+
+# generated media
+*.mp4
+*.wav
+*.part
+outputs/
+.gradio/
+flagged/
+.DS_Store

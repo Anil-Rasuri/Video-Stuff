@@ -1,0 +1,3 @@
+# Optional: remove background music before transcribing songs ("vocal separation").
+# Large install (PyTorch). Only needed if you tick "Remove background music first".
+demucs

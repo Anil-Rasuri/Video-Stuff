@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-captioner"
+version = "0.1.0"
+description = "Free animated captions and lyrics (Telugu, Hindi, English) for short videos."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = ["faster-whisper>=1.1.0"]
+
+[project.optional-dependencies]
+app = ["gradio>=4.44"]
+vocals = ["demucs"]
+
+[project.scripts]
+captioner = "captioner.cli:main"
+
+[tool.setuptools]
+packages = ["captioner"]
