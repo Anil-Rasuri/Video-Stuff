@@ -14,5 +14,7 @@ jobs:
           python-version: "3.11"
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install Python packages used by the tests
+        run: pip install numpy
       - name: Run tests (no model download needed)
         run: python -m unittest discover -s tests -t . -v
