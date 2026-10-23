@@ -153,3 +153,84 @@ class StructureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StyleVarietyTests(unittest.TestCase):
+    LINES = [Line.from_text("hello brave new world", 1.0, 3.0), Line.from_text(TELUGU, 3.5, 5.5)]
+
+    def test_every_entry_animation_with_every_mode(self):
+        from captioner.presets import ENTRIES
+
+        for preset in ("classic", "karaoke", "tiktok", "reveal"):
+            for entry in ENTRIES:
+                with self.subTest(preset=preset, entry=entry):
+                    ass = build(preset, self.LINES, animation=entry)
+                    evs = events(ass)
+                    self.assertGreaterEqual(len(evs), 2)
+                    for ev in evs:
+                        s, e = times(ev)
+                        self.assertLess(s, e)
+                        self.assertEqual(ev.count("{"), ev.count("}"), ev)
+
+    def test_new_entry_tags(self):
+        one = [Line.from_text("hello there", 1.0, 3.0)]
+        self.assertIn("\\fry90", build("classic", one, animation="flip"))
+        self.assertIn("\\frz-8", build("classic", one, animation="wobble"))
+        self.assertIn("\\fscx140", build("classic", one, animation="zoom"))
+        self.assertIn("\\blur12", build("classic", one, animation="blur_in"))
+        for entry in ("drop", "slide_left", "slide_right", "slide_up"):
+            self.assertIn("\\move(", build("classic", one, animation=entry))
+        # entering from the left starts left of the final x position
+        ev = events(build("classic", one, animation="slide_left"))[0]
+        x0, _, x1 = [int(v) for v in re.search(r"\\move\((-?\d+),(\d+),(-?\d+)", ev).groups()]
+        self.assertLess(x0, x1)
+
+    def test_scale_entries_fall_back_in_word_modes(self):
+        for entry in ("pop", "zoom"):
+            self.assertEqual(resolve_style(StyleOptions(preset="tiktok", animation=entry)).entry, "fade")
+        self.assertEqual(resolve_style(StyleOptions(preset="tiktok", animation="flip")).entry, "flip")
+
+    def test_blur_in_ends_at_the_preset_blur(self):
+        ev = events(build("neon", [Line.from_text("hi there", 1, 3)], animation="blur_in"))
+        self.assertTrue(any("\\t(0," in e and "\\blur0.8)" in e for e in ev))
+
+    def test_narrow_space_scripts_get_wider_gaps(self):
+        # with no font files installed the per-script defaults apply: Telugu/Hindi are narrow
+        te = events(build("classic", [Line.from_text(TELUGU, 1, 3)]))[0]
+        self.assertIn("\\fsp", te)
+        latin = events(build("classic", [Line.from_text("hello brave new world", 1, 3)]))[0]
+        self.assertNotIn("\\fsp", latin)
+
+    def test_word_spacing_option(self):
+        one = [Line.from_text("hello brave new world", 1, 3)]
+        wider = events(build("classic", one, word_spacing=2.0))[0]
+        self.assertIn("\\fsp", wider)
+        def gap(ass):
+            return float(re.search(r"\\fsp(\d+\.\d)\}", events(ass)[0]).group(1))
+        self.assertGreater(gap(build("classic", one, word_spacing=3.0)), gap(build("classic", one, word_spacing=2.0)))
+
+    def test_gap_resets_to_style_spacing_and_keeps_karaoke_timing(self):
+        ev = events(build("karaoke", [Line.from_text(TELUGU, 2.0, 7.0)]))[0]
+        self.assertRegex(ev, r"\{\\fsp[\d.]+\} \{\\fsp0\.0\}")
+        s, e = times(ev)
+        total_cs = sum(int(x) for x in re.findall(r"\\k(?:f)?(\d+)", ev))
+        self.assertAlmostEqual(total_cs / 100.0, 7.0 - s, delta=0.05)
+
+    def test_new_presets_exist_and_use_registered_fonts(self):
+        from captioner.fonts import FONTS
+
+        for key in ("comic", "marker", "elegant", "impact", "dream"):
+            pr = PRESETS[key]
+            for fam in (pr.latin_font, pr.telugu_font, pr.devanagari_font):
+                self.assertIn(fam, FONTS, (key, fam))
+
+    def test_font_registry_is_consistent(self):
+        from captioner.fonts import FONTS, fonts_for
+
+        self.assertGreaterEqual(len(fonts_for("telugu")), 15)
+        for fam, spec in FONTS.items():
+            self.assertTrue(spec.files and spec.scripts, fam)
+            for f in spec.files:
+                self.assertTrue(f.endswith(".ttf"), f)
+            if spec.has_bold:
+                self.assertTrue(any("Bold" in f for f in spec.files), fam)

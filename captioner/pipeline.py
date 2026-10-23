@@ -38,7 +38,8 @@ def transcribe_video(
         try:
             from .vocals import separate_vocals as _separate
 
-            audio = _separate(audio, work / "stems")
+            vocals = _separate(audio, work / "stems")
+            audio = extract_audio(vocals, work / "vocals_16k.wav")  # back to 16 kHz mono
         except Exception as exc:  # fall back to the original audio
             warnings.append("Vocal separation skipped: %s" % exc)
 

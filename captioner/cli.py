@@ -39,6 +39,7 @@ def _add_style_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--size", type=float, default=1.0, help="font size multiplier (default 1.0)")
     p.add_argument("--position", choices=list(POSITIONS), default=None)
     p.add_argument("--uppercase", action="store_true", default=None)
+    p.add_argument("--word-spacing", type=float, default=1.0, help="gap between words, 1.0 = normal (try 1.5)")
     p.add_argument("--preview", action="store_true", help="render only ~6 seconds to check the look")
 
 
@@ -55,6 +56,7 @@ def _options(args) -> StyleOptions:
         size_scale=args.size,
         position=args.position,
         uppercase=args.uppercase,
+        word_spacing=args.word_spacing,
     )
 
 

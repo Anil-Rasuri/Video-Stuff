@@ -59,6 +59,36 @@ _SPECS: List[FontSpec] = [
     _spec("Bebas Neue", "ofl/bebasneue", ["BebasNeue-Regular.ttf"], ["latin"]),
     _spec("Lobster", "ofl/lobster", ["Lobster-Regular.ttf"], ["latin"]),
     _spec("Pacifico", "ofl/pacifico", ["Pacifico-Regular.ttf"], ["latin"]),
+    _spec("Bangers", "ofl/bangers", ["Bangers-Regular.ttf"], ["latin"]),
+    _spec("Permanent Marker", "ofl/permanentmarker", ["PermanentMarker-Regular.ttf"], ["latin"]),
+    _spec("Righteous", "ofl/righteous", ["Righteous-Regular.ttf"], ["latin"]),
+    _spec("Lilita One", "ofl/lilitaone", ["LilitaOne-Regular.ttf"], ["latin"]),
+    _spec("Bungee", "ofl/bungee", ["Bungee-Regular.ttf"], ["latin"]),
+    _spec("Great Vibes", "ofl/greatvibes", ["GreatVibes-Regular.ttf"], ["latin"]),
+    _spec("Satisfy", "ofl/satisfy", ["Satisfy-Regular.ttf"], ["latin"]),
+    _spec("Press Start 2P", "ofl/pressstart2p", ["PressStart2P-Regular.ttf"], ["latin"]),
+    # --- more Telugu ------------------------------------------------------
+    _spec("Peddana", "ofl/peddana", ["Peddana-Regular.ttf"], ["telugu"]),
+    _spec("Ramaraja", "ofl/ramaraja", ["Ramaraja-Regular.ttf"], ["telugu"]),
+    _spec("Lakki Reddy", "ofl/lakkireddy", ["LakkiReddy-Regular.ttf"], ["telugu"]),
+    _spec("Ravi Prakash", "ofl/raviprakash", ["RaviPrakash-Regular.ttf"], ["telugu"]),
+    _spec("Timmana", "ofl/timmana", ["Timmana-Regular.ttf"], ["telugu"]),
+    _spec("Tenali Ramakrishna", "ofl/tenaliramakrishna", ["TenaliRamakrishna-Regular.ttf"], ["telugu"]),
+    _spec("Sree Krushnadevaraya", "ofl/sreekrushnadevaraya", ["SreeKrushnadevaraya-Regular.ttf"], ["telugu"]),
+    _spec("Mallanna", "ofl/mallanna", ["Mallanna-Regular.ttf"], ["telugu"]),
+    _spec("Gidugu", "ofl/gidugu", ["Gidugu-Regular.ttf"], ["telugu"]),
+    _spec("Suranna", "ofl/suranna", ["Suranna-Regular.ttf"], ["telugu"]),
+    _spec("Sirivennela", "ofl/sirivennela", ["Sirivennela-Regular.ttf"], ["telugu"]),
+    _spec("Hind Guntur", "ofl/hindguntur", ["HindGuntur-Regular.ttf", "HindGuntur-Bold.ttf"], ["telugu", "latin"], True),
+    # --- more Hindi (Devanagari) -------------------------------------------
+    _spec("Kalam", "ofl/kalam", ["Kalam-Regular.ttf", "Kalam-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Tillana", "ofl/tillana", ["Tillana-Regular.ttf", "Tillana-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Amita", "ofl/amita", ["Amita-Regular.ttf", "Amita-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Sahitya", "ofl/sahitya", ["Sahitya-Regular.ttf", "Sahitya-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Khand", "ofl/khand", ["Khand-Regular.ttf", "Khand-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Rajdhani", "ofl/rajdhani", ["Rajdhani-Regular.ttf", "Rajdhani-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Palanquin", "ofl/palanquin", ["Palanquin-Regular.ttf", "Palanquin-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Karma", "ofl/karma", ["Karma-Regular.ttf", "Karma-Bold.ttf"], ["devanagari", "latin"], True),
 ]
 
 FONTS: Dict[str, FontSpec] = {s.family: s for s in _SPECS}
@@ -97,6 +127,28 @@ def _system_has(family: str) -> bool:
         return False
     names = [n.strip().lower() for n in out.replace("\n", ",").split(",")]
     return family.lower() in names
+
+
+@functools.lru_cache(maxsize=None)
+def space_width_em(family: str):
+    """Width of the space glyph in em (1.0 = font size), or None if unknown.
+
+    Some Telugu/Devanagari fonts have a very narrow space, which makes words run
+    together in captions. Reads the local .ttf with Pillow.
+    """
+    spec = FONTS.get(family)
+    if spec is None:
+        return None
+    files = _local_files(spec)
+    if not files:
+        return None
+    try:
+        from PIL import ImageFont
+
+        font = ImageFont.truetype(str(files[0]), 1000)
+        return float(font.getlength(" ")) / 1000.0
+    except Exception:
+        return None
 
 
 def font_available(family: str) -> bool:

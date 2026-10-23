@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 MODES = ("static", "karaoke", "word_highlight", "word_reveal")
-ENTRIES = ("none", "fade", "pop", "slide_up")
+ENTRIES = ("none", "fade", "pop", "slide_up", "zoom", "blur_in", "slide_left", "slide_right", "drop", "flip", "wobble")
 POSITIONS = ("bottom", "middle", "top")
 
 
@@ -44,6 +44,7 @@ class Preset:
     position: str = "bottom"
     margin_v: float = 0.10  # distance from top/bottom edge, fraction of min(w, h)
     spacing: float = 0.0
+    word_spacing: float = 1.0  # multiplier for the gap between words
 
 
 PRESETS: Dict[str, Preset] = {
@@ -170,6 +171,85 @@ PRESETS: Dict[str, Preset] = {
             box_alpha=0x66,
             bold=False,
         ),
+        Preset(
+            key="comic",
+            label="Comic burst",
+            description="Chunky comic lettering that wobbles in. Loud and fun.",
+            mode="static",
+            entry="wobble",
+            latin_font="Bangers",
+            telugu_font="Ravi Prakash",
+            devanagari_font="Kalam",
+            size=0.085,
+            base_color="#FFEB3B",
+            outline_color="#1B1B1B",
+            outline=0.10,
+            shadow=0.05,
+            uppercase=True,
+            bold=False,
+        ),
+        Preset(
+            key="marker",
+            label="Marker karaoke",
+            description="Hand-drawn marker lettering; words light up orange and blur into focus.",
+            mode="karaoke",
+            entry="blur_in",
+            latin_font="Permanent Marker",
+            telugu_font="Lakki Reddy",
+            devanagari_font="Kalam",
+            size=0.075,
+            highlight_color="#FF7A00",
+            outline=0.07,
+            bold=False,
+        ),
+        Preset(
+            key="elegant",
+            label="Elegant script",
+            description="Graceful script text that zooms gently into place.",
+            mode="static",
+            entry="zoom",
+            latin_font="Great Vibes",
+            telugu_font="Peddana",
+            devanagari_font="Sahitya",
+            size=0.085,
+            base_color="#FDF6E3",
+            outline_color="#3B2A1A",
+            outline=0.07,
+            bold=False,
+        ),
+        Preset(
+            key="impact",
+            label="Impact word-pop",
+            description="Heavy block letters; the spoken word flashes cyan. Cards flip in.",
+            mode="word_highlight",
+            entry="flip",
+            latin_font="Bungee",
+            telugu_font="Ramaraja",
+            devanagari_font="Khand",
+            size=0.075,
+            highlight_color="#00E5FF",
+            outline=0.09,
+            shadow=0.04,
+            active_scale=1.1,
+            position="middle",
+            bold=False,
+            uppercase=True,
+        ),
+        Preset(
+            key="dream",
+            label="Dreamy reveal",
+            description="Soft rounded text; words appear one by one, sliding in from the right.",
+            mode="word_reveal",
+            entry="slide_right",
+            latin_font="Righteous",
+            telugu_font="Timmana",
+            devanagari_font="Palanquin",
+            size=0.075,
+            highlight_color="#FF4DA6",
+            outline_color="#2A0F3B",
+            outline=0.08,
+            bold=False,
+        ),
     ]
 }
 
@@ -191,6 +271,7 @@ class StyleOptions:
     size_scale: float = 1.0
     position: Optional[str] = None
     uppercase: Optional[bool] = None
+    word_spacing: float = 1.0
 
 
 _RGB_FUNC = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)")
@@ -240,9 +321,10 @@ def resolve_style(opts: StyleOptions) -> Preset:
     base = PRESETS[opts.preset]
     scale = opts.size_scale or 1.0
     changes["size"] = base.size * max(0.3, min(3.0, float(scale)))
+    changes["word_spacing"] = base.word_spacing * max(0.3, min(4.0, float(opts.word_spacing or 1.0)))
     style = dataclasses.replace(base, **changes)
 
     # Scale animations need a per-word layout; fall back to a fade for word modes.
-    if style.mode in ("word_highlight", "word_reveal") and style.entry == "pop":
+    if style.mode in ("word_highlight", "word_reveal") and style.entry in ("pop", "zoom"):
         style = dataclasses.replace(style, entry="fade")
     return style

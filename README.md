@@ -4,7 +4,7 @@ Free, open-source **animated captions and lyrics** for short videos (up to 60 se
 
 - **Speech/lyrics → text** with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper), running locally. No API keys, no cost.
 - **Word-level timing**, so words highlight exactly when they are spoken or sung.
-- **8 animated styles**: karaoke sweep, word highlight (Reels/TikTok), word-by-word reveal, pop-in, slide-up, neon glow, boxed, classic.
+- **13 animated styles** and **11 entry animations** (fade, pop, zoom, blur-in, wobble, flip, drop, slide up/left/right...), mix and match.
 - **Free fonts for all three scripts** (Google Fonts, SIL OFL), chosen automatically per word, so a line mixing Telugu, Hindi and English renders correctly.
 - **Edit before you render**: a table lets you correct the lyrics; the timing is kept.
 - Exports the **video (.mp4)**, **.srt**, **.ass** and an editable **.json**.
@@ -30,6 +30,10 @@ python app.py
 
 On first run the app downloads the free fonts (~a few MB) and, when you first transcribe, the Whisper model (from ~250 MB for `small` up to ~3 GB for `large-v3`). After that it works offline.
 
+### No install: Google Colab
+
+Open `colab.ipynb` in [Google Colab](https://colab.research.google.com) (File → Upload notebook), choose a **T4 GPU** runtime, and run the cells top to bottom. This is also the easy fix if Windows blocks the speech library with *"An Application Control policy has blocked this file"* (Smart App Control).
+
 ## Using the web app
 
 1. **Upload** your video, choose the **language** and whether it is **speech** or a **song / music video**, then click **Transcribe**.
@@ -50,7 +54,7 @@ python -m captioner presets      # list styles
 python -m captioner fonts        # download fonts   (--list shows what is installed)
 ```
 
-Useful options: `--animation {none,fade,pop,slide_up}`, `--latin-font`, `--telugu-font`, `--hindi-font`, `--color`, `--highlight`, `--outline`, `--size 1.2`, `--position {bottom,middle,top}`, `--uppercase`, `--max-words 4`, `--preview`.
+Useful options: `--animation {none,fade,pop,slide_up,zoom,blur_in,slide_left,slide_right,drop,flip,wobble}`, `--word-spacing 1.5` (widen the gap between words), `--latin-font`, `--telugu-font`, `--hindi-font`, `--color`, `--highlight`, `--outline`, `--size 1.2`, `--position {bottom,middle,top}`, `--uppercase`, `--max-words 4`, `--preview`.
 
 ## Style presets
 
@@ -64,6 +68,11 @@ Useful options: `--animation {none,fade,pop,slide_up}`, `--latin-font`, `--telug
 | `slideup` | Script font; lines glide up into place |
 | `neon` | Glowing neon colour sweep |
 | `boxed` | Text on a semi-transparent box |
+| `comic` | Chunky comic lettering that wobbles in |
+| `marker` | Hand-drawn marker karaoke, blurs into focus |
+| `elegant` | Graceful script that zooms into place |
+| `impact` | Heavy block letters, spoken word flashes, cards flip in |
+| `dream` | Soft rounded words sliding in one by one |
 
 Add your own in `captioner/presets.py`: a preset is a few lines (mode, entry animation, fonts, colours, sizes).
 
@@ -78,9 +87,11 @@ Add your own in `captioner/presets.py`: a preset is a few lines (mode, entry ani
 
 `python -m captioner fonts` downloads these (all SIL OFL) into `./fonts`:
 
-- **Telugu:** Mandali, Ramabhadra, Gurajada, Suravaram, NTR, Dhurjati
-- **Hindi (Devanagari):** Hind, Mukta, Poppins, Yatra One, Rozha One
-- **English:** Poppins, Anton, Bebas Neue, Lobster, Pacifico
+- **Telugu:** Mandali, Ramabhadra, Gurajada, Suravaram, NTR, Dhurjati, Peddana, Ramaraja, Lakki Reddy, Ravi Prakash, Timmana, Tenali Ramakrishna, Sree Krushnadevaraya, Mallanna, Gidugu, Suranna, Sirivennela, Hind Guntur
+- **Hindi (Devanagari):** Hind, Mukta, Poppins, Yatra One, Rozha One, Kalam, Tillana, Amita, Sahitya, Khand, Rajdhani, Palanquin, Karma
+- **English:** Poppins, Anton, Bebas Neue, Lobster, Pacifico, Bangers, Permanent Marker, Righteous, Lilita One, Bungee, Great Vibes, Satisfy, Press Start 2P
+
+Words running together? Some fonts have a very narrow space. The app widens it automatically; use the **Word spacing** slider (or `--word-spacing`) to fine-tune.
 
 If a download fails (offline / blocked), copy the `.ttf` files into `fonts/` yourself. To add a font, add one line to `captioner/fonts.py` (family name must match the name inside the font file).
 

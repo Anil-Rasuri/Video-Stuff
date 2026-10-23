@@ -30,7 +30,10 @@ DEFAULT = "Preset default"
 
 
 def _font_choices(script: str):
-    return [(DEFAULT, "")] + [(f, f) for f in fontlib.fonts_for(script)]
+    """Fonts for a script; only the installed ones when we can tell (so a pick always works)."""
+    names = fontlib.fonts_for(script)
+    installed = [f for f in names if fontlib.font_available(f)]
+    return [(DEFAULT, "")] + [(f, f) for f in (installed or names)]
 
 
 def _as_rows(table):
@@ -74,7 +77,7 @@ def do_transcribe(video, language, content, model, max_words, hint, separate, pr
 
 
 def _render(video, table, originals, preset, anim, f_lat, f_te, f_hi, custom, c_base, c_hl, c_out,
-            size, position, uppercase, preview):
+            size, position, uppercase, spacing, preview):
     if not video:
         raise gr.Error("Please upload a video first.")
     lines = rows_to_lines(_as_rows(table), originals or [])
@@ -92,6 +95,7 @@ def _render(video, table, originals, preset, anim, f_lat, f_te, f_hi, custom, c_
         size_scale=float(size),
         position=position or None,
         uppercase=True if uppercase else None,
+        word_spacing=float(spacing),
     )
     try:
         res = render_captions(video, lines, opts, out_dir=tempfile.mkdtemp(prefix="captioner_out_"), preview=preview)
@@ -128,7 +132,7 @@ def build_ui() -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("### 1 · Upload & transcribe")
-                video = gr.Video(label="Video", sources=["upload"])
+                video = gr.Video(label="Video", sources=["upload"], height=300)
                 language = gr.Dropdown(list(LANGUAGES), value="Telugu (తెలుగు)", label="Language")
                 content = gr.Radio(CONTENT_TYPES, value=CONTENT_TYPES[1], label="Content type")
                 model = gr.Dropdown(MODEL_SIZES, value="small", label="Accuracy (bigger = better but slower)")
@@ -166,6 +170,7 @@ def build_ui() -> gr.Blocks:
                 [(DEFAULT, "")] + [(p.title(), p) for p in POSITIONS], value="", label="Position"
             )
             size = gr.Slider(0.6, 1.8, value=1.0, step=0.05, label="Text size")
+            spacing = gr.Slider(0.5, 3.0, value=1.0, step=0.1, label="Word spacing")
             uppercase = gr.Checkbox(label="UPPERCASE (English only)", value=False)
         with gr.Row():
             f_lat = gr.Dropdown(_font_choices("latin"), value="", label="English font")
@@ -180,7 +185,7 @@ def build_ui() -> gr.Blocks:
         with gr.Row():
             preview_btn = gr.Button("Preview (6 s)")
             render_btn = gr.Button("3 · Render full video", variant="primary")
-        out_video = gr.Video(label="Result")
+        out_video = gr.Video(label="Result", height=420)
         downloads = gr.File(label="Downloads (video, .srt, .ass, editable .json)", file_count="multiple")
         out_status = gr.Markdown()
 
@@ -190,7 +195,7 @@ def build_ui() -> gr.Blocks:
             outputs=[table, originals, status],
         )
         style_inputs = [video, table, originals, preset, anim, f_lat, f_te, f_hi,
-                        custom, c_base, c_hl, c_out, size, position, uppercase]
+                        custom, c_base, c_hl, c_out, size, position, uppercase, spacing]
         preview_btn.click(do_preview, inputs=style_inputs, outputs=[out_video, downloads, out_status])
         render_btn.click(do_full, inputs=style_inputs, outputs=[out_video, downloads, out_status])
     return demo
@@ -206,6 +211,7 @@ def main() -> None:
     demo.queue().launch(
         server_name=os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1"),
         server_port=int(os.environ.get("GRADIO_SERVER_PORT", "7860")),
+        share=os.environ.get("GRADIO_SHARE") == "1",  # public link, used by the Colab notebook
     )
 
 

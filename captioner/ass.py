@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .fonts import supports_bold
+from .fonts import space_width_em, supports_bold
 from .models import Line
 from .presets import Preset
 from .scripts import script_of
@@ -87,12 +87,34 @@ def _font_tag(word: str, style: Preset, fams) -> tuple:
 # --------------------------------------------------------------------------
 
 
+# Entry animations that also fade in.
+FADE_IN_ENTRIES = (
+    "fade", "slide_up", "zoom", "blur_in", "slide_left", "slide_right", "drop", "flip", "wobble",
+)
+
+# Wanted width of the gap between words (em). Narrow-spaced fonts are widened to this.
+SPACE_TARGET_EM = 0.30
+_DEFAULT_SPACE_EM = {"latin": 0.27, "telugu": 0.12, "devanagari": 0.18}
+
+
+def _gap(word: str, style: Preset, fams, g: "_Geo") -> str:
+    """Separator placed after ``word``: a normal space, widened if the font's space is too narrow."""
+    script = script_of(word)
+    width = space_width_em(fams[script])
+    if width is None:
+        width = _DEFAULT_SPACE_EM[script]
+    extra_em = SPACE_TARGET_EM * style.word_spacing - width
+    if extra_em < 0.04:
+        return " "
+    return "{\\fsp%.1f} {\\fsp%.1f}" % (extra_em * g.fs, style.spacing * g.fs)
+
+
 def _head(style: Preset, first: bool, last: bool, dur_ms: int, g: _Geo, entry=None, extra="") -> str:
     entry = style.entry if entry is None else entry
     parts = ["\\an%d" % g.align]
     fade_in = fade_out = 0
     if entry != "none":
-        if first and entry in ("fade", "slide_up"):
+        if first and entry in FADE_IN_ENTRIES:
             fade_in = 150
         if last:
             fade_out = 120
@@ -101,16 +123,35 @@ def _head(style: Preset, first: bool, last: bool, dur_ms: int, g: _Geo, entry=No
     if total > cap and total > 0:
         k = cap / float(total)
         fade_in, fade_out = int(fade_in * k), int(fade_out * k)
-    if first and entry == "slide_up":
-        d = max(60, min(260, int(dur_ms)))
-        parts.append("\\move(%d,%d,%d,%d,0,%d)" % (g.x, g.y + g.rise, g.x, g.y, d))
-    else:
-        parts.append("\\pos(%d,%d)" % (g.x, g.y))
+
+    d = max(60, min(260, int(dur_ms)))  # how long the entry movement takes (ms)
+    dx = int(round(g.width * 0.12))
+    pos = "\\pos(%d,%d)" % (g.x, g.y)
+    if first:
+        origin = {
+            "slide_up": (g.x, g.y + g.rise),
+            "drop": (g.x, g.y - 2 * g.rise),
+            "slide_left": (g.x - dx, g.y),
+            "slide_right": (g.x + dx, g.y),
+        }.get(entry)
+        if origin:
+            pos = "\\move(%d,%d,%d,%d,0,%d)" % (origin[0], origin[1], g.x, g.y, d)
+    parts.append(pos)
     if fade_in or fade_out:
         parts.append("\\fad(%d,%d)" % (fade_in, fade_out))
-    if first and entry == "pop":
-        parts.append("\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)\\t(150,250,\\fscx100\\fscy100)")
-    if style.blur > 0:
+
+    if first:
+        if entry == "pop":
+            parts.append("\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)\\t(150,250,\\fscx100\\fscy100)")
+        elif entry == "zoom":
+            parts.append("\\fscx140\\fscy140\\t(0,%d,\\fscx100\\fscy100)" % (d + 100))
+        elif entry == "flip":
+            parts.append("\\fry90\\t(0,%d,\\fry0)" % (d + 100))
+        elif entry == "wobble":
+            parts.append("\\frz-8\\t(0,100,\\frz6)\\t(100,200,\\frz-3)\\t(200,300,\\frz0)")
+    if first and entry == "blur_in":
+        parts.append("\\blur12\\t(0,%d,\\blur%.1f)" % (d + 100, style.blur))
+    elif style.blur > 0:
         parts.append("\\blur%.1f" % style.blur)
     parts.append(extra)
     return "{" + "".join(parts) + "}"
@@ -133,7 +174,7 @@ def _dialogue(layer: int, start: float, end: float, text: str) -> str:
 # --------------------------------------------------------------------------
 
 
-def _inline_text(texts: Sequence[str], style: Preset, fams, base_key, karaoke_cs=None, lead_cs=0) -> str:
+def _inline_text(texts: Sequence[str], style: Preset, fams, base_key, g, karaoke_cs=None, lead_cs=0) -> str:
     """Whole line as inline text, switching font per script; optional \\kf timing."""
     out: List[str] = []
     cur = base_key
@@ -149,7 +190,7 @@ def _inline_text(texts: Sequence[str], style: Preset, fams, base_key, karaoke_cs
             cur = key
         if tags:
             out.append("{" + tags + "}")
-        out.append(word + (" " if i < len(texts) - 1 else ""))
+        out.append(word + (_gap(word, style, fams, g) if i < len(texts) - 1 else ""))
     return "".join(out)
 
 
@@ -166,7 +207,7 @@ def _static_or_karaoke(line, texts, ev_start, ev_end, style, g, fams, base_key) 
         end_b = max(bounds[-1], int(round((line.end - ev_start) * 100)))
         lead_cs = bounds[0]
         cs = [(bounds[i + 1] if i + 1 < len(bounds) else end_b) - bounds[i] for i in range(len(bounds))]
-    body = _inline_text(texts, style, fams, base_key, cs, lead_cs)
+    body = _inline_text(texts, style, fams, base_key, g, cs, lead_cs)
 
     events = []
     if style.glow_color:
@@ -224,7 +265,7 @@ def _word_events(line, texts, ev_start, ev_end, style, g, fams) -> List[str]:
                     tags = ftag + "\\c%s\\fscx%d\\fscy%d" % (hl, scale, scale)
                 else:
                     tags = ftag + "\\c%s\\fscx100\\fscy100" % base
-            pieces.append("{" + tags + "}" + word + (" " if i < n - 1 else ""))
+            pieces.append("{" + tags + "}" + word + (_gap(word, style, fams, g) if i < n - 1 else ""))
         events.append(_dialogue(0, s, e, head + "".join(pieces)))
     return events
 
