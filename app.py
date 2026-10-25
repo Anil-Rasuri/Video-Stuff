@@ -125,7 +125,7 @@ def build_ui() -> gr.Blocks:
         gr.Markdown(
             "# 🎬 Video Captioner\n"
             "Free animated captions & lyrics for Telugu, Hindi and English videos "
-            "(up to %d seconds), synced to the audio." % MAX_SECONDS
+            "(up to %d minutes), synced to the audio." % (MAX_SECONDS // 60)
         )
         originals = gr.State([])
 

@@ -117,3 +117,49 @@ class TranscribeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BlockedAvTests(unittest.TestCase):
+    """If PyAV cannot be imported (blocked DLL), faster-whisper must still load."""
+
+    def test_import_survives_a_broken_av(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            (tmp / "av").mkdir()
+            (tmp / "av" / "__init__.py").write_text(
+                "raise ImportError('DLL load failed while importing frame: An Application Control policy has blocked this file.')\n")
+            (tmp / "faster_whisper").mkdir()
+            (tmp / "faster_whisper" / "__init__.py").write_text(
+                "import av\nclass WhisperModel:\n    pass\n")
+            saved = {k: sys.modules.pop(k) for k in list(sys.modules) if k == "av" or k.startswith(("av.", "faster_whisper"))}
+            sys.path.insert(0, str(tmp))
+            try:
+                model_cls = tr._import_whisper_model()
+                self.assertEqual(model_cls.__name__, "WhisperModel")
+                with self.assertRaises(RuntimeError):
+                    sys.modules["av"].anything  # the stub fails loudly if PyAV is ever really needed
+            finally:
+                sys.path.remove(str(tmp))
+                for k in [k for k in sys.modules if k == "av" or k.startswith(("av.", "faster_whisper"))]:
+                    del sys.modules[k]
+                sys.modules.update(saved)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_unrelated_import_errors_are_reported(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            (tmp / "faster_whisper").mkdir()
+            (tmp / "faster_whisper" / "__init__.py").write_text("import definitely_not_installed_pkg\n")
+            saved = {k: sys.modules.pop(k) for k in list(sys.modules) if k == "av" or k.startswith(("av.", "faster_whisper"))}
+            sys.path.insert(0, str(tmp))
+            try:
+                with self.assertRaisesRegex(RuntimeError, "could not be loaded"):
+                    tr._import_whisper_model()
+            finally:
+                sys.path.remove(str(tmp))
+                for k in [k for k in sys.modules if k == "av" or k.startswith(("av.", "faster_whisper"))]:
+                    del sys.modules[k]
+                sys.modules.update(saved)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)

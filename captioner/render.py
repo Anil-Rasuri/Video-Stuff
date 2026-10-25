@@ -16,7 +16,7 @@ from .ass import build_ass
 from .models import Line, save_lines, to_srt
 from .presets import StyleOptions, resolve_style
 
-MAX_SECONDS = float(os.environ.get("CAPTIONER_MAX_SECONDS", "60"))
+MAX_SECONDS = float(os.environ.get("CAPTIONER_MAX_SECONDS", "120"))
 
 
 class RenderError(RuntimeError):

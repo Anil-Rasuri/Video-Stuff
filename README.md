@@ -1,6 +1,6 @@
 # 🎬 Video Captioner
 
-Free, open-source **animated captions and lyrics** for short videos (up to 60 seconds) in **Telugu, Hindi and English**. Upload a video, get word-accurate text, fix any mistakes, pick a style, and download the video with captions burned in, synced to the audio.
+Free, open-source **animated captions and lyrics** for short videos (up to 2 minutes) in **Telugu, Hindi and English**. Upload a video, get word-accurate text, fix any mistakes, pick a style, and download the video with captions burned in, synced to the audio.
 
 - **Speech/lyrics → text** with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper), running locally. No API keys, no cost.
 - **Word-level timing**, so words highlight exactly when they are spoken or sung.
@@ -132,7 +132,7 @@ Run the tests (no model download needed): `python -m unittest discover -s tests 
 ## Limitations
 
 - Transcription accuracy depends on Whisper. Singing over loud music, fast rap, heavy accents and code-mixed lyrics can need manual correction.
-- Videos are limited to 60 s by default (`CAPTIONER_MAX_SECONDS` to change it).
+- Videos are limited to 120 s (2 minutes) by default (`CAPTIONER_MAX_SECONDS` to change it).
 - Captions are burned into the video. Use the exported `.srt` / `.ass` if you want soft subtitles.
 
 ## License

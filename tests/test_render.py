@@ -112,8 +112,9 @@ class RenderTests(unittest.TestCase):
 
     def test_duration_limit(self):
         with self.assertRaises(ValueError):
-            check_duration(VideoInfo(1280, 720, 75.0, True))
-        check_duration(VideoInfo(1280, 720, 60.2, True))  # small tolerance
+            check_duration(VideoInfo(1280, 720, 125.0, True))
+        check_duration(VideoInfo(1280, 720, 120.2, True))  # small tolerance
+        check_duration(VideoInfo(1280, 720, 75.0, True))  # 2 minutes are allowed
         with self.assertRaises(ValueError):
             render_captions(self.video, self.lines, StyleOptions(), self.tmp / "lim", max_seconds=3)
 

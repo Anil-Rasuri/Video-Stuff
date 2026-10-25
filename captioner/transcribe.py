@@ -43,18 +43,51 @@ def _pick_device():
     return "cpu", "int8"
 
 
-@functools.lru_cache(maxsize=2)
-def _load_model(size: str, device: str, compute_type: str):
+def _stub_av() -> None:
+    """Replace PyAV by an inert stand-in.
+
+    faster-whisper imports PyAV only to *decode files*; this app always hands it
+    raw samples instead. On some systems (e.g. Windows Smart App Control) PyAV's
+    unsigned DLLs are blocked, which would stop faster-whisper from importing.
+    """
+    import sys
+    import types
+
+    for name in [n for n in sys.modules if n == "av" or n.startswith("av.") or n.startswith("faster_whisper")]:
+        del sys.modules[name]
+    stub = types.ModuleType("av")
+
+    def _unavailable(name):
+        raise RuntimeError("PyAV is not available; pass raw audio samples instead (attribute %r)" % name)
+
+    stub.__getattr__ = _unavailable
+    sys.modules["av"] = stub
+
+
+def _import_whisper_model():
     try:
         from faster_whisper import WhisperModel
-    except ImportError as exc:  # pragma: no cover - depends on the environment
-        # Show the real reason: it is often a blocked/missing DLL, not a missing package.
-        raise RuntimeError(
-            "faster-whisper could not be loaded: %s\n"
-            "If it is genuinely missing run:  pip install -r requirements.txt\n"
-            "If Windows says 'Application Control policy has blocked this file', "
-            "use the Google Colab notebook (colab.ipynb) instead." % exc
-        ) from exc
+
+        return WhisperModel
+    except ImportError as first:
+        _stub_av()  # retry without PyAV
+        try:
+            from faster_whisper import WhisperModel
+
+            return WhisperModel
+        except ImportError as second:
+            # Show the real reason: often a blocked/missing DLL, not a missing package.
+            raise RuntimeError(
+                "faster-whisper could not be loaded: %s\n(first attempt: %s)\n"
+                "If it is genuinely missing run:  pip install -r requirements.txt\n"
+                "If Windows says 'Application Control policy has blocked this file', "
+                "use the Google Colab notebook (colab.ipynb) instead." % (second, first)
+            ) from second
+
+
+@functools.lru_cache(maxsize=2)
+def _load_model(size: str, device: str, compute_type: str):
+    WhisperModel = _import_whisper_model()
     return WhisperModel(size, device=device, compute_type=compute_type)
 
 
