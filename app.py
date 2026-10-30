@@ -203,7 +203,7 @@ def build_ui() -> gr.Blocks:
             with gr.Tab("Style presets"):
                 pg = _safe_gallery(previews.preset_gallery)
                 preset_keys = [k for _, _, k in pg]
-                preset_gal = gr.Gallery(value=[(p, l) for p, l, _ in pg], columns=4, height=420,
+                preset_gal = gr.Gallery(value=[(p, l) for p, l, _ in pg], columns=2, height=520, object_fit="contain",
                                         allow_preview=False, show_label=False)
 
                 def pick_preset(evt: gr.SelectData):
@@ -215,7 +215,7 @@ def build_ui() -> gr.Blocks:
                 with gr.Tab(title):
                     fg = _safe_gallery(previews.font_gallery, script)
                     names = [fam for _, fam in fg]
-                    gal = gr.Gallery(value=[(p, f) for p, f in fg], columns=3, height=460,
+                    gal = gr.Gallery(value=[(p, f) for p, f in fg], columns=2, height=520, object_fit="contain",
                                      allow_preview=False, show_label=False)
 
                     def pick_font(evt: gr.SelectData, names=names):
