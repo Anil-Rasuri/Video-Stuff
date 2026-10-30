@@ -13,9 +13,11 @@ from pathlib import Path
 import gradio as gr
 
 from captioner import fonts as fontlib
+from captioner import previews
 from captioner.models import lines_to_rows, rows_to_lines
 from captioner.pipeline import transcribe_video
-from captioner.presets import ENTRIES, POSITIONS, PRESET_ORDER, PRESETS, StyleOptions
+from captioner.presets import (COLOR_EFFECT_LABELS, COLOR_EFFECTS, EFFECTS, ENTRIES, POSITIONS,
+                               PRESET_ORDER, PRESETS, StyleOptions)
 from captioner.render import MAX_SECONDS, RenderError, render_captions
 from captioner.transcribe import MODEL_SIZES
 
@@ -34,6 +36,15 @@ def _font_choices(script: str):
     names = fontlib.fonts_for(script)
     installed = [f for f in names if fontlib.font_available(f)]
     return [(DEFAULT, "")] + [(f, f) for f in (installed or names)]
+
+
+def _safe_gallery(fn, *args):
+    """Preview pictures are a nicety: never let a failure stop the app from starting."""
+    try:
+        return fn(*args)
+    except Exception as exc:  # pragma: no cover
+        print("[previews] skipped:", exc)
+        return []
 
 
 def _as_rows(table):
@@ -77,7 +88,7 @@ def do_transcribe(video, language, content, model, max_words, hint, separate, pr
 
 
 def _render(video, table, originals, preset, anim, f_lat, f_te, f_hi, custom, c_base, c_hl, c_out,
-            size, position, uppercase, spacing, preview):
+            size, position, uppercase, spacing, effect, color_effect, preview):
     if not video:
         raise gr.Error("Please upload a video first.")
     lines = rows_to_lines(_as_rows(table), originals or [])
@@ -96,6 +107,8 @@ def _render(video, table, originals, preset, anim, f_lat, f_te, f_hi, custom, c_
         position=position or None,
         uppercase=True if uppercase else None,
         word_spacing=float(spacing),
+        effect=effect or "none",
+        color_effect=color_effect or "none",
     )
     try:
         res = render_captions(video, lines, opts, out_dir=tempfile.mkdtemp(prefix="captioner_out_"), preview=preview)
@@ -173,9 +186,42 @@ def build_ui() -> gr.Blocks:
             spacing = gr.Slider(0.5, 3.0, value=1.0, step=0.1, label="Word spacing")
             uppercase = gr.Checkbox(label="UPPERCASE (English only)", value=False)
         with gr.Row():
+            color_effect = gr.Dropdown(
+                [(DEFAULT, "none")] + [(COLOR_EFFECT_LABELS.get(k, k), k) for k in COLOR_EFFECTS],
+                value="none", label="Colourful text (rainbow, fire, gold...)",
+            )
+            effect = gr.Dropdown(
+                [(e.title(), e) for e in EFFECTS], value="none", label="Motion effect (pulse, sway)"
+            )
+        with gr.Row():
             f_lat = gr.Dropdown(_font_choices("latin"), value="", label="English font")
             f_te = gr.Dropdown(_font_choices("telugu"), value="", label="Telugu font")
             f_hi = gr.Dropdown(_font_choices("devanagari"), value="", label="Hindi font")
+
+        gr.Markdown("**Look before you choose** - click a picture to select it.")
+        with gr.Tabs():
+            with gr.Tab("Style presets"):
+                pg = _safe_gallery(previews.preset_gallery)
+                preset_keys = [k for _, _, k in pg]
+                preset_gal = gr.Gallery(value=[(p, l) for p, l, _ in pg], columns=4, height=420,
+                                        allow_preview=False, show_label=False)
+
+                def pick_preset(evt: gr.SelectData):
+                    return preset_keys[evt.index]
+
+                preset_gal.select(pick_preset, None, preset)
+            for title, script, target in (("English fonts", "latin", f_lat), ("Telugu fonts", "telugu", f_te),
+                                          ("Hindi fonts", "devanagari", f_hi)):
+                with gr.Tab(title):
+                    fg = _safe_gallery(previews.font_gallery, script)
+                    names = [fam for _, fam in fg]
+                    gal = gr.Gallery(value=[(p, f) for p, f in fg], columns=3, height=460,
+                                     allow_preview=False, show_label=False)
+
+                    def pick_font(evt: gr.SelectData, names=names):
+                        return names[evt.index]
+
+                    gal.select(pick_font, None, target)
         with gr.Row():
             custom = gr.Checkbox(label="Use custom colours", value=False)
             c_base = gr.ColorPicker(value="#FFFFFF", label="Text")
@@ -195,7 +241,7 @@ def build_ui() -> gr.Blocks:
             outputs=[table, originals, status],
         )
         style_inputs = [video, table, originals, preset, anim, f_lat, f_te, f_hi,
-                        custom, c_base, c_hl, c_out, size, position, uppercase, spacing]
+                        custom, c_base, c_hl, c_out, size, position, uppercase, spacing, effect, color_effect]
         preview_btn.click(do_preview, inputs=style_inputs, outputs=[out_video, downloads, out_status])
         render_btn.click(do_full, inputs=style_inputs, outputs=[out_video, downloads, out_status])
     return demo

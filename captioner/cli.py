@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import fonts as fontlib
 from .models import load_lines, save_lines
-from .presets import ENTRIES, POSITIONS, PRESETS, StyleOptions
+from .presets import COLOR_EFFECTS, EFFECTS, ENTRIES, POSITIONS, PRESETS, StyleOptions
 
 LANG_CHOICES = ["auto", "te", "hi", "en"]
 
@@ -40,6 +40,9 @@ def _add_style_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--position", choices=list(POSITIONS), default=None)
     p.add_argument("--uppercase", action="store_true", default=None)
     p.add_argument("--word-spacing", type=float, default=1.0, help="gap between words, 1.0 = normal (try 1.5)")
+    p.add_argument("--effect", choices=list(EFFECTS), default="none", help="continuous motion: pulse or sway")
+    p.add_argument("--color-effect", choices=["none"] + list(COLOR_EFFECTS), default="none",
+                   help="colourful text: rainbow/candy/sunset words, or fire/gold/ocean/bubblegum/mint gradient")
     p.add_argument("--preview", action="store_true", help="render only ~6 seconds to check the look")
 
 
@@ -57,6 +60,8 @@ def _options(args) -> StyleOptions:
         position=args.position,
         uppercase=args.uppercase,
         word_spacing=args.word_spacing,
+        effect=args.effect,
+        color_effect=args.color_effect,
     )
 
 

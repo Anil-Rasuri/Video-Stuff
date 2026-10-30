@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .fonts import space_width_em, supports_bold
+from .fonts import line_height_em, space_width_em, supports_bold
 from .models import Line
 from .presets import Preset
 from .scripts import script_of
@@ -67,6 +67,24 @@ class _Geo:
     rise: int  # slide-up travel distance in px
 
 
+_DEFAULT_LINE_EM = {"latin": 1.3, "telugu": 1.6, "devanagari": 1.7}
+
+
+def _band_limits(style: Preset, texts, fams, g: "_Geo"):
+    """(top, bottom) pixel rows where the glyphs of a caption line sit, for gradient bands."""
+    scripts = {script_of(t) for t in texts} or {"latin"}
+    h_em = max((line_height_em(fams[sc]) or _DEFAULT_LINE_EM[sc]) for sc in scripts)
+    h = h_em * g.fs
+    if g.align == 2:  # bottom-anchored
+        bottom, top = g.y, g.y - h
+    elif g.align == 8:  # top-anchored
+        top, bottom = g.y, g.y + h
+    else:  # middle
+        top, bottom = g.y - h / 2.0, g.y + h / 2.0
+    # glyph ink sits a little inside the line box
+    return top + 0.16 * h, bottom - 0.14 * h
+
+
 def _fams(style: Preset):
     return {
         "latin": style.latin_font,
@@ -90,6 +108,7 @@ def _font_tag(word: str, style: Preset, fams) -> tuple:
 # Entry animations that also fade in.
 FADE_IN_ENTRIES = (
     "fade", "slide_up", "zoom", "blur_in", "slide_left", "slide_right", "drop", "flip", "wobble",
+    "bounce", "swing", "spin", "glitch",
 )
 
 # Wanted width of the gap between words (em). Narrow-spaced fonts are widened to this.
@@ -109,6 +128,80 @@ def _gap(word: str, style: Preset, fams, g: "_Geo") -> str:
     return "{\\fsp%.1f} {\\fsp%.1f}" % (extra_em * g.fs, style.spacing * g.fs)
 
 
+def _entry(entry: str, style: Preset, g: "_Geo", d: int):
+    """(position tag, extra transform tags) for the entry animation ``entry``.
+
+    ``d`` is how long (ms) the movement may take.
+    """
+    dx = int(round(g.width * 0.12))
+    pos = "\\pos(%d,%d)" % (g.x, g.y)
+    tags = ""
+    moves = {
+        "slide_up": (g.x, g.y + g.rise),
+        "drop": (g.x, g.y - 2 * g.rise),
+        "slide_left": (g.x - dx, g.y),
+        "slide_right": (g.x + dx, g.y),
+        "bounce": (g.x, g.y - 4 * g.rise),
+    }
+    if entry in moves:
+        o = moves[entry]
+        dd = d if entry != "bounce" else max(120, min(220, d))
+        pos = "\\move(%d,%d,%d,%d,0,%d)" % (o[0], o[1], g.x, g.y, dd)
+    if entry == "pop":
+        tags = "\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)\\t(150,250,\\fscx100\\fscy100)"
+    elif entry == "zoom":
+        tags = "\\fscx140\\fscy140\\t(0,%d,\\fscx100\\fscy100)" % (d + 100)
+    elif entry == "elastic":
+        tags = (
+            "\\fscx0\\fscy0\\t(0,120,\\fscx126\\fscy126)\\t(120,200,\\fscx90\\fscy90)"
+            "\\t(200,270,\\fscx106\\fscy106)\\t(270,330,\\fscx100\\fscy100)"
+        )
+    elif entry == "bounce":
+        dd = max(120, min(220, d))
+        tags = "\\t(%d,%d,\\fscx118\\fscy82)\\t(%d,%d,\\fscx100\\fscy100)" % (dd, dd + 70, dd + 70, dd + 190)
+    elif entry == "flip":
+        tags = "\\fry90\\t(0,%d,\\fry0)" % (d + 100)
+    elif entry == "wobble":
+        tags = "\\frz-8\\t(0,100,\\frz6)\\t(100,200,\\frz-3)\\t(200,300,\\frz0)"
+    elif entry == "swing":  # pendulum: rotate about a point above the text
+        tags = "\\org(%d,%d)\\frz-24\\t(0,%d,\\frz5)\\t(%d,%d,\\frz0)" % (
+            g.x, g.y - 4 * g.fs, d + 120, d + 120, d + 300)
+    elif entry == "spin":
+        cy = {2: g.y - int(0.6 * g.fs), 8: g.y + int(0.6 * g.fs)}.get(g.align, g.y)
+        tags = "\\org(%d,%d)\\frz-300\\fscx20\\fscy20\\t(0,%d,\\frz0\\fscx100\\fscy100)" % (g.x, cy, d + 200)
+    elif entry == "glitch":
+        tags = (
+            "\\frz-4\\fscx112\\t(0,70,\\frz4\\fscx92)\\t(70,140,\\frz-2\\fscx106)"
+            "\\t(140,210,\\frz1\\fscx98)\\t(210,260,\\frz0\\fscx100)"
+        )
+    elif entry == "wipe_right":
+        x0, x1 = int(g.width * 0.04), int(g.width * 0.96)
+        tags = "\\clip(%d,0,%d,%d)\\t(0,%d,\\clip(%d,0,%d,%d))" % (x0, x0, g.height, d + 250, x0, x1, g.height)
+    elif entry == "curtain":
+        x0, x1, mid = int(g.width * 0.04), int(g.width * 0.96), g.width // 2
+        tags = "\\clip(%d,0,%d,%d)\\t(0,%d,\\clip(%d,0,%d,%d))" % (mid, mid, g.height, d + 250, x0, x1, g.height)
+    return pos, tags
+
+
+def _effect(style: Preset, dur_ms: int) -> str:
+    """Continuous effect (pulse / sway) as \\t keyframes after the entry has finished."""
+    if style.effect == "none" or style.mode not in ("static", "karaoke"):
+        return ""
+    out = []
+    if style.effect == "pulse":  # heartbeat-like scale beat
+        t = 350
+        while t + 300 < dur_ms and len(out) < 60:
+            out.append("\\t(%d,%d,\\fscx107\\fscy107)\\t(%d,%d,\\fscx100\\fscy100)" % (t, t + 110, t + 110, t + 300))
+            t += 500
+    elif style.effect == "sway":  # gentle rocking
+        t, sign = 350, 1
+        while t + 600 < dur_ms and len(out) < 60:
+            out.append("\\t(%d,%d,\\frz%d)" % (t, t + 600, 2 * sign))
+            t += 600
+            sign = -sign
+    return "".join(out)
+
+
 def _head(style: Preset, first: bool, last: bool, dur_ms: int, g: _Geo, entry=None, extra="") -> str:
     entry = style.entry if entry is None else entry
     parts = ["\\an%d" % g.align]
@@ -125,34 +218,17 @@ def _head(style: Preset, first: bool, last: bool, dur_ms: int, g: _Geo, entry=No
         fade_in, fade_out = int(fade_in * k), int(fade_out * k)
 
     d = max(60, min(260, int(dur_ms)))  # how long the entry movement takes (ms)
-    dx = int(round(g.width * 0.12))
-    pos = "\\pos(%d,%d)" % (g.x, g.y)
-    if first:
-        origin = {
-            "slide_up": (g.x, g.y + g.rise),
-            "drop": (g.x, g.y - 2 * g.rise),
-            "slide_left": (g.x - dx, g.y),
-            "slide_right": (g.x + dx, g.y),
-        }.get(entry)
-        if origin:
-            pos = "\\move(%d,%d,%d,%d,0,%d)" % (origin[0], origin[1], g.x, g.y, d)
+    pos, tags = _entry(entry, style, g, d) if first else ("\\pos(%d,%d)" % (g.x, g.y), "")
     parts.append(pos)
     if fade_in or fade_out:
         parts.append("\\fad(%d,%d)" % (fade_in, fade_out))
-
-    if first:
-        if entry == "pop":
-            parts.append("\\fscx0\\fscy0\\t(0,150,\\fscx112\\fscy112)\\t(150,250,\\fscx100\\fscy100)")
-        elif entry == "zoom":
-            parts.append("\\fscx140\\fscy140\\t(0,%d,\\fscx100\\fscy100)" % (d + 100))
-        elif entry == "flip":
-            parts.append("\\fry90\\t(0,%d,\\fry0)" % (d + 100))
-        elif entry == "wobble":
-            parts.append("\\frz-8\\t(0,100,\\frz6)\\t(100,200,\\frz-3)\\t(200,300,\\frz0)")
+    parts.append(tags)
     if first and entry == "blur_in":
         parts.append("\\blur12\\t(0,%d,\\blur%.1f)" % (d + 100, style.blur))
     elif style.blur > 0:
         parts.append("\\blur%.1f" % style.blur)
+    if first:
+        parts.append(_effect(style, dur_ms))
     parts.append(extra)
     return "{" + "".join(parts) + "}"
 
@@ -162,6 +238,14 @@ def _glow_extra(style: Preset, g: _Geo) -> str:
         tag_color(style.glow_color),
         g.fs * 0.14,
         g.fs * 0.12,
+    )
+
+
+def _border2_extra(style: Preset, g: _Geo) -> str:
+    """Second, wider coloured outline drawn underneath the normal one."""
+    return "\\1a&HFF&\\2a&HFF&\\3c%s\\bord%.1f\\shad0" % (
+        tag_color(style.border2_color),
+        g.fs * (style.outline + style.border2),
     )
 
 
@@ -185,6 +269,8 @@ def _inline_text(texts: Sequence[str], style: Preset, fams, base_key, g, karaoke
         tags = ""
         if karaoke_cs is not None:
             tags += "\\kf%d" % karaoke_cs[i]
+        if style.palette:  # colourful words: unsung colour in karaoke, fill colour otherwise
+            tags += ("\\2c%s" if karaoke_cs is not None else "\\1c%s") % tag_color(style.palette[i % len(style.palette)])
         if key != cur:
             tags += ftag
             cur = key
@@ -210,11 +296,24 @@ def _static_or_karaoke(line, texts, ev_start, ev_end, style, g, fams, base_key) 
     body = _inline_text(texts, style, fams, base_key, g, cs, lead_cs)
 
     events = []
+    grad = style.gradient if (style.mode == "static" and len(style.gradient) >= 2) else ()
     if style.glow_color:
         head = _head(style, True, True, dur_ms, g, extra=_glow_extra(style, g))
         events.append(_dialogue(0, ev_start, ev_end, head + body))
-    head = _head(style, True, True, dur_ms, g)
+    if style.border2_color:
+        head = _head(style, True, True, dur_ms, g, extra=_border2_extra(style, g))
+        events.append(_dialogue(0, ev_start, ev_end, head + body))
+    head = _head(style, True, True, dur_ms, g, extra=("\\1c%s" % tag_color(grad[0])) if grad else "")
     events.append(_dialogue(1, ev_start, ev_end, head + body))
+    if grad:  # vertical colour bands: overlay clipped copies of the text
+        top, bottom = _band_limits(style, texts, fams, g)
+        n = len(grad)
+        cuts = [top + (bottom - top) * k / float(n) for k in range(1, n)] + [g.height]
+        for k in range(1, n):
+            y0, y1 = int(round(cuts[k - 1])) - 1, int(round(cuts[k]))
+            extra = "\\1c%s\\bord0\\shad0\\clip(0,%d,%d,%d)" % (tag_color(grad[k]), y0, g.width, y1)
+            head = _head(style, True, True, dur_ms, g, extra=extra)
+            events.append(_dialogue(1 + k, ev_start, ev_end, head + body))
     return events
 
 
@@ -236,8 +335,10 @@ def _word_events(line, texts, ev_start, ev_end, style, g, fams) -> List[str]:
 
     base = tag_color(style.base_color)
     hl = tag_color(style.highlight_color)
+    pal = [tag_color(c) for c in style.palette]
     scale = int(round(style.active_scale * 100))
 
+    base_default = base
     events = []
     for k, (s, e, active) in enumerate(spans):
         first, last = k == 0, k == len(spans) - 1
@@ -250,6 +351,7 @@ def _word_events(line, texts, ev_start, ev_end, style, g, fams) -> List[str]:
         pieces = []
         for i, word in enumerate(texts):
             _, ftag = _font_tag(word, style, fams)
+            base = pal[i % len(pal)] if pal else base_default
             if reveal:
                 if i > active:
                     tags = ftag + "\\alpha&HFF&"
@@ -310,6 +412,8 @@ def build_ass(
         border_style, outline_w, shadow_w = 1, fs * style.outline, fs * style.shadow
         outline_c = style_color(style.outline_color)
         back_c = style_color(style.back_color, 0x60)
+        if style.shadow_color:  # solid coloured drop shadow (3D look)
+            back_c = style_color(style.shadow_color, 0)
 
     header = [
         "[Script Info]",

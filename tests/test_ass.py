@@ -234,3 +234,50 @@ class StyleVarietyTests(unittest.TestCase):
                 self.assertTrue(f.endswith(".ttf"), f)
             if spec.has_bold:
                 self.assertTrue(any("Bold" in f for f in spec.files), fam)
+
+
+class StylishTests(unittest.TestCase):
+    LINES = [Line.from_text("hello brave new world", 1.0, 3.0), Line.from_text(TELUGU, 3.5, 5.5)]
+
+    def test_all_entries_and_effects_build(self):
+        from captioner.presets import EFFECTS, ENTRIES
+
+        self.assertEqual(len(ENTRIES), 18)
+        for entry in ENTRIES:
+            for effect in EFFECTS:
+                with self.subTest(entry=entry, effect=effect):
+                    for ev in events(build("classic", self.LINES, animation=entry, effect=effect)):
+                        s, e = times(ev)
+                        self.assertLess(s, e)
+                        self.assertEqual(ev.count("{"), ev.count("}"), ev)
+
+    def test_color_effects(self):
+        from captioner.presets import COLOR_EFFECTS
+
+        for name in COLOR_EFFECTS:
+            with self.subTest(effect=name):
+                self.assertTrue(events(build("classic", self.LINES, color_effect=name)))
+        self.assertGreater(len(events(build("classic", self.LINES, color_effect="fire"))),
+                           len(events(build("classic", self.LINES))))  # gradient bands = extra layers
+        with self.assertRaises(ValueError):
+            build("classic", self.LINES, color_effect="nope")
+
+    def test_presets_count_and_fonts(self):
+        from captioner.fonts import FONTS
+
+        self.assertGreaterEqual(len(PRESETS), 23)
+        for key, pr in PRESETS.items():
+            for fam in (pr.latin_font, pr.telugu_font, pr.devanagari_font):
+                self.assertIn(fam, FONTS, (key, fam))
+
+    def test_custom_font_discovery_and_previews(self):
+        import shutil, tempfile
+        from pathlib import Path
+        from captioner import previews
+
+        if not shutil.which("ffmpeg"):
+            self.skipTest("ffmpeg missing")
+        pg = previews.preset_gallery()
+        self.assertEqual(len(pg), len(PRESETS))
+        for path, _label, _key in pg:
+            self.assertTrue(Path(path).stat().st_size > 0)

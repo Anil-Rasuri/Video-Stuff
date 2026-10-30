@@ -12,7 +12,28 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 MODES = ("static", "karaoke", "word_highlight", "word_reveal")
-ENTRIES = ("none", "fade", "pop", "slide_up", "zoom", "blur_in", "slide_left", "slide_right", "drop", "flip", "wobble")
+ENTRIES = (
+    "none", "fade", "pop", "slide_up", "zoom", "blur_in", "slide_left", "slide_right", "drop", "flip", "wobble",
+    "elastic", "bounce", "swing", "spin", "wipe_right", "curtain", "glitch",
+)
+EFFECTS = ("none", "pulse", "sway")  # continuous motion while the caption is on screen
+
+# Colour effects the user can pick: per-word colour cycles, or vertical gradients.
+COLOR_EFFECTS = {
+    "rainbow": ("palette", ("#FF5252", "#FFB300", "#FFEB3B", "#69F0AE", "#40C4FF", "#B388FF")),
+    "candy": ("palette", ("#FF80AB", "#80D8FF", "#CCFF90", "#FFE57F", "#EA80FC")),
+    "sunset": ("palette", ("#FF6F00", "#FF1744", "#F50057", "#FFD740")),
+    "fire": ("gradient", ("#FFF59D", "#FF9800", "#E53935")),
+    "gold": ("gradient", ("#FFF9C4", "#FFC107", "#B8860B")),
+    "ocean": ("gradient", ("#E0F7FA", "#26C6DA", "#1565C0")),
+    "bubblegum": ("gradient", ("#FFC1E3", "#FF4DA6", "#8E24AA")),
+    "mint": ("gradient", ("#F1FFE0", "#69F0AE", "#00897B")),
+}
+COLOR_EFFECT_LABELS = {
+    "rainbow": "Rainbow words", "candy": "Candy words", "sunset": "Sunset words",
+    "fire": "Gradient: fire", "gold": "Gradient: gold", "ocean": "Gradient: ocean",
+    "bubblegum": "Gradient: bubblegum", "mint": "Gradient: mint",
+}
 POSITIONS = ("bottom", "middle", "top")
 
 
@@ -45,6 +66,12 @@ class Preset:
     margin_v: float = 0.10  # distance from top/bottom edge, fraction of min(w, h)
     spacing: float = 0.0
     word_spacing: float = 1.0  # multiplier for the gap between words
+    palette: tuple = ()  # colours cycled per word (rainbow look)
+    gradient: tuple = ()  # 2-3 colours, top to bottom (static mode only)
+    border2_color: Optional[str] = None  # second, wider outline (sticker look)
+    border2: float = 0.10  # extra width of that outline, fraction of font size
+    shadow_color: Optional[str] = None  # solid coloured drop shadow (3D look)
+    effect: str = "none"  # see EFFECTS
 
 
 PRESETS: Dict[str, Preset] = {
@@ -250,6 +277,183 @@ PRESETS: Dict[str, Preset] = {
             outline=0.08,
             bold=False,
         ),
+        Preset(
+            key="rainbow",
+            label="Rainbow words",
+            description="Every word in a different bright colour, bouncy elastic entrance.",
+            mode="static",
+            entry="elastic",
+            latin_font="Lilita One",
+            telugu_font="Ramabhadra",
+            devanagari_font="Modak",
+            size=0.085,
+            outline_color="#1A1A1A",
+            outline=0.11,
+            shadow=0.04,
+            bold=False,
+            palette=COLOR_EFFECTS["rainbow"][1],
+        ),
+        Preset(
+            key="fire",
+            label="Fire gradient 3D",
+            description="Yellow-to-red gradient letters with a dark red 3D shadow.",
+            mode="static",
+            entry="zoom",
+            latin_font="Bebas Neue",
+            telugu_font="Gurajada",
+            devanagari_font="Rozha One",
+            size=0.095,
+            outline_color="#3B0A00",
+            outline=0.07,
+            shadow=0.07,
+            shadow_color="#7F0000",
+            uppercase=True,
+            bold=False,
+            gradient=COLOR_EFFECTS["fire"][1],
+        ),
+        Preset(
+            key="gold3d",
+            label="Gold 3D",
+            description="Shiny gold lettering with a heavy bronze shadow; swings in like a sign.",
+            mode="static",
+            entry="swing",
+            latin_font="Rozha One",
+            telugu_font="Ramaraja",
+            devanagari_font="Rozha One",
+            size=0.09,
+            outline_color="#3B2A00",
+            outline=0.05,
+            shadow=0.07,
+            shadow_color="#6D4C00",
+            bold=False,
+            gradient=COLOR_EFFECTS["gold"][1],
+        ),
+        Preset(
+            key="ocean",
+            label="Ocean gradient",
+            description="Cool aqua-to-blue gradient with a white sticker border; blurs into focus.",
+            mode="static",
+            entry="blur_in",
+            latin_font="Righteous",
+            telugu_font="Timmana",
+            devanagari_font="Palanquin",
+            size=0.085,
+            outline_color="#0B2E5C",
+            outline=0.06,
+            border2_color="#FFFFFF",
+            border2=0.09,
+            bold=False,
+            gradient=COLOR_EFFECTS["ocean"][1],
+        ),
+        Preset(
+            key="sticker",
+            label="Candy sticker",
+            description="Pastel candy-coloured words with a thick white sticker outline; bounces in.",
+            mode="static",
+            entry="bounce",
+            latin_font="Lilita One",
+            telugu_font="Gurajada",
+            devanagari_font="Modak",
+            size=0.085,
+            outline_color="#4A148C",
+            outline=0.07,
+            border2_color="#FFFFFF",
+            border2=0.12,
+            shadow=0.0,
+            bold=False,
+            palette=COLOR_EFFECTS["candy"][1],
+        ),
+        Preset(
+            key="cyber",
+            label="Cyber glitch",
+            description="Word-by-word green highlight; each line glitches in. Great for reels.",
+            mode="word_highlight",
+            entry="glitch",
+            latin_font="Bungee",
+            telugu_font="Ravi Prakash",
+            devanagari_font="Khand",
+            size=0.07,
+            highlight_color="#39FF14",
+            outline_color="#101010",
+            outline=0.10,
+            shadow=0.05,
+            active_scale=1.12,
+            uppercase=True,
+            bold=False,
+            position="middle",
+        ),
+        Preset(
+            key="retro3d",
+            label="Retro 3D",
+            description="Yellow arcade lettering with a hot-pink block shadow; spins in.",
+            mode="static",
+            entry="spin",
+            latin_font="Press Start 2P",
+            telugu_font="Suravaram",
+            devanagari_font="Tillana",
+            size=0.055,
+            base_color="#FFEB3B",
+            outline_color="#1B1B1B",
+            outline=0.09,
+            shadow=0.09,
+            shadow_color="#FF2E63",
+            bold=False,
+        ),
+        Preset(
+            key="karaoke_rainbow",
+            label="Rainbow karaoke",
+            description="Words wait in rainbow colours and turn white as they are sung; pulses to the beat.",
+            mode="karaoke",
+            entry="fade",
+            latin_font="Lilita One",
+            telugu_font="Mandali",
+            devanagari_font="Kalam",
+            size=0.08,
+            base_color="#FFFFFF",
+            highlight_color="#FFFFFF",
+            outline_color="#1A1A1A",
+            outline=0.10,
+            shadow=0.04,
+            bold=False,
+            effect="pulse",
+            palette=COLOR_EFFECTS["rainbow"][1],
+        ),
+        Preset(
+            key="royal",
+            label="Royal calligraphy",
+            description="Elegant calligraphy with a double gold border; opens like a curtain.",
+            mode="static",
+            entry="curtain",
+            latin_font="Great Vibes",
+            telugu_font="Peddana",
+            devanagari_font="Kalam",
+            size=0.09,
+            base_color="#FFF8E1",
+            outline_color="#3E2723",
+            outline=0.06,
+            border2_color="#D4AF37",
+            border2=0.09,
+            bold=False,
+            effect="sway",
+        ),
+        Preset(
+            key="beat",
+            label="Beat pulse",
+            description="Big glowing text that pulses like a heartbeat. Made for music videos.",
+            mode="static",
+            entry="elastic",
+            latin_font="Bungee",
+            telugu_font="Ramabhadra",
+            devanagari_font="Modak",
+            size=0.08,
+            outline_color="#2A0F3B",
+            outline=0.08,
+            glow_color="#FF2BD6",
+            uppercase=True,
+            bold=False,
+            effect="pulse",
+            position="middle",
+        ),
     ]
 }
 
@@ -272,6 +476,8 @@ class StyleOptions:
     position: Optional[str] = None
     uppercase: Optional[bool] = None
     word_spacing: float = 1.0
+    effect: Optional[str] = None
+    color_effect: Optional[str] = None
 
 
 _RGB_FUNC = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)")
@@ -318,13 +524,32 @@ def resolve_style(opts: StyleOptions) -> Preset:
     if opts.uppercase is not None:
         changes["uppercase"] = bool(opts.uppercase)
 
+    if opts.effect:
+        if opts.effect not in EFFECTS:
+            raise ValueError("Unknown effect %r. Choose from: %s" % (opts.effect, ", ".join(EFFECTS)))
+        changes["effect"] = opts.effect
     base = PRESETS[opts.preset]
+    if opts.color_effect and opts.color_effect != "none":
+        if opts.color_effect not in COLOR_EFFECTS:
+            raise ValueError(
+                "Unknown colour effect %r. Choose from: %s" % (opts.color_effect, ", ".join(COLOR_EFFECTS))
+            )
+        kind, cols = COLOR_EFFECTS[opts.color_effect]
+        mode = base.mode
+        if kind == "gradient" and mode == "static":
+            changes["gradient"], changes["palette"] = cols, ()
+        else:  # gradients only work on whole lines; otherwise cycle the colours per word
+            changes["palette"], changes["gradient"] = cols, ()
     scale = opts.size_scale or 1.0
     changes["size"] = base.size * max(0.3, min(3.0, float(scale)))
     changes["word_spacing"] = base.word_spacing * max(0.3, min(4.0, float(opts.word_spacing or 1.0)))
     style = dataclasses.replace(base, **changes)
 
     # Scale animations need a per-word layout; fall back to a fade for word modes.
-    if style.mode in ("word_highlight", "word_reveal") and style.entry in ("pop", "zoom"):
+    scale_based = ("pop", "zoom", "elastic", "bounce", "spin", "glitch")
+    if style.mode in ("word_highlight", "word_reveal") and style.entry in scale_based:
+        style = dataclasses.replace(style, entry="fade")
+    # gradient bands use a clip rectangle, which the wipe animations also need
+    if style.gradient and style.entry in ("wipe_right", "curtain"):
         style = dataclasses.replace(style, entry="fade")
     return style

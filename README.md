@@ -4,7 +4,8 @@ Free, open-source **animated captions and lyrics** for short videos (up to 2 min
 
 - **Speech/lyrics → text** with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper), running locally. No API keys, no cost.
 - **Word-level timing**, so words highlight exactly when they are spoken or sung.
-- **13 animated styles** and **11 entry animations** (fade, pop, zoom, blur-in, wobble, flip, drop, slide up/left/right...), mix and match.
+- **23 animated styles** (rainbow, fire, gold 3D, neon, sticker, cyber, retro...) and **18 entry animations** (pop, zoom, elastic, bounce, swing, spin, flip, wipe, curtain, glitch...), plus **pulse/sway motion** and **colourful text** (rainbow words, fire/gold/ocean gradients).
+- **Live previews**: pictures of every font and style inside the app; click one to select it.
 - **Free fonts for all three scripts** (Google Fonts, SIL OFL), chosen automatically per word, so a line mixing Telugu, Hindi and English renders correctly.
 - **Edit before you render**: a table lets you correct the lyrics; the timing is kept.
 - Exports the **video (.mp4)**, **.srt**, **.ass** and an editable **.json**.
@@ -54,7 +55,7 @@ python -m captioner presets      # list styles
 python -m captioner fonts        # download fonts   (--list shows what is installed)
 ```
 
-Useful options: `--animation {none,fade,pop,slide_up,zoom,blur_in,slide_left,slide_right,drop,flip,wobble}`, `--word-spacing 1.5` (widen the gap between words), `--latin-font`, `--telugu-font`, `--hindi-font`, `--color`, `--highlight`, `--outline`, `--size 1.2`, `--position {bottom,middle,top}`, `--uppercase`, `--max-words 4`, `--preview`.
+Useful options: `--animation <name> (18 to choose from), `--effect {none,pulse,sway}`, `--color-effect {rainbow,candy,sunset,fire,gold,ocean,bubblegum,mint}``, `--word-spacing 1.5` (widen the gap between words), `--latin-font`, `--telugu-font`, `--hindi-font`, `--color`, `--highlight`, `--outline`, `--size 1.2`, `--position {bottom,middle,top}`, `--uppercase`, `--max-words 4`, `--preview`.
 
 ## Style presets
 
@@ -73,6 +74,7 @@ Useful options: `--animation {none,fade,pop,slide_up,zoom,blur_in,slide_left,sli
 | `elegant` | Graceful script that zooms into place |
 | `impact` | Heavy block letters, spoken word flashes, cards flip in |
 | `dream` | Soft rounded words sliding in one by one |
+| `rainbow`, `fire`, `gold3d`, `ocean`, `sticker`, `cyber`, `retro3d`, `karaoke_rainbow`, `royal`, `beat` | Colourful / 3D / glowing looks (see the preview gallery) |
 
 Add your own in `captioner/presets.py`: a preset is a few lines (mode, entry animation, fonts, colours, sizes).
 
@@ -90,6 +92,8 @@ Add your own in `captioner/presets.py`: a preset is a few lines (mode, entry ani
 - **Telugu:** Mandali, Ramabhadra, Gurajada, Suravaram, NTR, Dhurjati, Peddana, Ramaraja, Lakki Reddy, Ravi Prakash, Timmana, Tenali Ramakrishna, Sree Krushnadevaraya, Mallanna, Gidugu, Suranna, Sirivennela, Hind Guntur
 - **Hindi (Devanagari):** Hind, Mukta, Poppins, Yatra One, Rozha One, Kalam, Tillana, Amita, Sahitya, Khand, Rajdhani, Palanquin, Karma
 - **English:** Poppins, Anton, Bebas Neue, Lobster, Pacifico, Bangers, Permanent Marker, Righteous, Lilita One, Bungee, Great Vibes, Satisfy, Press Start 2P
+
+**Your own fonts:** drop any `.ttf`/`.otf` into the `fonts/` folder (e.g. a stylish display font you downloaded) and it appears in all three font lists and galleries automatically.
 
 Words running together? Some fonts have a very narrow space. The app widens it automatically; use the **Word spacing** slider (or `--word-spacing`) to fine-tune.
 

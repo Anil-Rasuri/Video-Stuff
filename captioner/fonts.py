@@ -66,6 +66,20 @@ _SPECS: List[FontSpec] = [
     _spec("Bungee", "ofl/bungee", ["Bungee-Regular.ttf"], ["latin"]),
     _spec("Great Vibes", "ofl/greatvibes", ["GreatVibes-Regular.ttf"], ["latin"]),
     _spec("Satisfy", "ofl/satisfy", ["Satisfy-Regular.ttf"], ["latin"]),
+    _spec("Modak", "ofl/modak", ["Modak-Regular.ttf"], ["devanagari", "latin"]),
+    _spec("Dekko", "ofl/dekko", ["Dekko-Regular.ttf"], ["devanagari", "latin"]),
+    _spec("Kurale", "ofl/kurale", ["Kurale-Regular.ttf"], ["devanagari", "latin"]),
+    _spec("Arya", "ofl/arya", ["Arya-Regular.ttf", "Arya-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Sura", "ofl/sura", ["Sura-Regular.ttf", "Sura-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Laila", "ofl/laila", ["Laila-Regular.ttf", "Laila-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Jaldi", "ofl/jaldi", ["Jaldi-Regular.ttf", "Jaldi-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Sumana", "ofl/sumana", ["Sumana-Regular.ttf", "Sumana-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Halant", "ofl/halant", ["Halant-Regular.ttf", "Halant-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Inknut Antiqua", "ofl/inknutantiqua", ["InknutAntiqua-Regular.ttf", "InknutAntiqua-Bold.ttf"], ["devanagari", "latin"], True),
+    _spec("Gotu", "ofl/gotu", ["Gotu-Regular.ttf"], ["devanagari", "latin"]),
+    _spec("Asar", "ofl/asar", ["Asar-Regular.ttf"], ["devanagari", "latin"]),
+    _spec("Tiro Telugu", "ofl/tirotelugu", ["TiroTelugu-Regular.ttf"], ["telugu", "latin"]),
+    _spec("Chathura", "ofl/chathura", ["Chathura-Regular.ttf", "Chathura-Bold.ttf"], ["telugu", "latin"], True),
     _spec("Press Start 2P", "ofl/pressstart2p", ["PressStart2P-Regular.ttf"], ["latin"]),
     # --- more Telugu ------------------------------------------------------
     _spec("Peddana", "ofl/peddana", ["Peddana-Regular.ttf"], ["telugu"]),
@@ -96,7 +110,38 @@ FONTS: Dict[str, FontSpec] = {s.family: s for s in _SPECS}
 
 def fonts_for(script: str) -> List[str]:
     """Family names that cover a script ('latin', 'telugu', 'devanagari')."""
-    return [s.family for s in _SPECS if script in s.scripts]
+    return [s.family for s in FONTS.values() if script in s.scripts]
+
+
+_FONT_EXTS = (".ttf", ".otf")
+
+
+def discover_custom_fonts() -> List[str]:
+    """Register any .ttf/.otf the user dropped into the fonts folder.
+
+    Custom fonts are offered for all three scripts (we cannot tell which glyphs a
+    font has), so just pick the one that looks right in the preview. Returns the
+    family names that were newly registered.
+    """
+    known_files = {fn for s in FONTS.values() for fn in s.files}
+    added: List[str] = []
+    if not FONT_DIR.is_dir():
+        return added
+    for path in sorted(FONT_DIR.iterdir()):
+        if path.suffix.lower() not in _FONT_EXTS or path.name in known_files or path.name.startswith("."):
+            continue
+        family = path.stem.split("-")[0].replace("_", " ")
+        try:
+            from PIL import ImageFont
+
+            family = ImageFont.truetype(str(path), 20).getname()[0] or family
+        except Exception:
+            pass
+        if family in FONTS:
+            continue
+        FONTS[family] = FontSpec(family, "", (path.name,), ("latin", "telugu", "devanagari"), False)
+        added.append(family)
+    return added
 
 
 def supports_bold(family: str) -> bool:
@@ -147,6 +192,22 @@ def space_width_em(family: str):
 
         font = ImageFont.truetype(str(files[0]), 1000)
         return float(font.getlength(" ")) / 1000.0
+    except Exception:
+        return None
+
+
+@functools.lru_cache(maxsize=None)
+def line_height_em(family: str):
+    """Height of one text line (ascent + descent) in em, or None if unknown."""
+    spec = FONTS.get(family)
+    files = _local_files(spec) if spec else []
+    if not files:
+        return None
+    try:
+        from PIL import ImageFont
+
+        ascent, descent = ImageFont.truetype(str(files[0]), 1000).getmetrics()
+        return (ascent + descent) / 1000.0
     except Exception:
         return None
 
@@ -233,6 +294,8 @@ def download_fonts(
     result: Dict[str, bool] = {}
     for fam in list(families) if families is not None else list(FONTS):
         spec = FONTS[fam]
+        if not spec.repo_dir:  # user-supplied font: nothing to download
+            continue
         ok = True
         for fname in spec.files:
             dest = FONT_DIR / fname
@@ -258,5 +321,8 @@ def download_fonts(
 
 def download_missing(log: Callable[[str], None] = print, timeout: float = 15.0) -> Dict[str, bool]:
     """Download only the families that have no local file yet."""
-    missing = [f for f, s in FONTS.items() if not _local_files(s)]
+    missing = [f for f, s in FONTS.items() if s.repo_dir and not _local_files(s)]
     return download_fonts(missing, log=log, timeout=timeout) if missing else {}
+
+
+discover_custom_fonts()
