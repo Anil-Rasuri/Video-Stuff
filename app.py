@@ -203,19 +203,29 @@ def build_ui() -> gr.Blocks:
             with gr.Tab("Style presets"):
                 pg = _safe_gallery(previews.preset_gallery)
                 preset_keys = [k for _, _, k in pg]
-                preset_gal = gr.Gallery(value=[(p, l) for p, l, _ in pg], columns=2, height=520, object_fit="contain",
+                preset_gal = gr.Gallery(value=[(p, l) for p, l, _ in pg], columns=5, height=400, object_fit="cover",
                                         allow_preview=False, show_label=False)
 
                 def pick_preset(evt: gr.SelectData):
                     return preset_keys[evt.index]
 
                 preset_gal.select(pick_preset, None, preset)
+            with gr.Tab("Animations (moving)"):
+                ag = _safe_gallery(previews.animation_gallery)
+                anim_names = [n for _, n in ag]
+                anim_gal = gr.Gallery(value=[(p, n.replace("_", " ").title()) for p, n in ag], columns=5,
+                                      object_fit="cover", height=400, allow_preview=False, show_label=False)
+
+                def pick_anim(evt: gr.SelectData):
+                    return anim_names[evt.index]
+
+                anim_gal.select(pick_anim, None, anim)
             for title, script, target in (("English fonts", "latin", f_lat), ("Telugu fonts", "telugu", f_te),
                                           ("Hindi fonts", "devanagari", f_hi)):
                 with gr.Tab(title):
                     fg = _safe_gallery(previews.font_gallery, script)
                     names = [fam for _, fam in fg]
-                    gal = gr.Gallery(value=[(p, f) for p, f in fg], columns=2, height=520, object_fit="contain",
+                    gal = gr.Gallery(value=[(p, f) for p, f in fg], columns=5, height=400, object_fit="cover",
                                      allow_preview=False, show_label=False)
 
                     def pick_font(evt: gr.SelectData, names=names):

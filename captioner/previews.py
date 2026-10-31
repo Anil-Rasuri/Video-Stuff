@@ -21,14 +21,15 @@ from .models import Line
 from .presets import PRESET_ORDER, PRESETS, StyleOptions, resolve_style
 
 CACHE_DIR = fontlib.FONT_DIR / ".previews"
-VERSION = "v4"
+VERSION = "v6"
+BOX = 300  # previews are small squares, so the gallery tiles are compact
 
 SAMPLES = {
     "latin": "Hello Stylish World",
     "telugu": "నమస్కారం తెలుగు అక్షరాలు",
     "devanagari": "नमस्ते सहेली हिन्दी",
 }
-PRESET_SAMPLE = "Hello నమస్కారం नमस्ते"
+PRESET_SAMPLE = "Hello నమస్కారం"
 
 
 def _frame(ass_text: str, families, w: int, h: int, t: float, out: Path, bg: str) -> bool:
@@ -69,7 +70,7 @@ def font_preview(family: str, script: str) -> Optional[Path]:
     base = dataclasses.replace(
         PRESETS["classic"],
         entry="none",
-        size=0.36,
+        size=0.11,
         outline=0.05,
         shadow=0.02,
         position="middle",
@@ -79,8 +80,8 @@ def font_preview(family: str, script: str) -> Optional[Path]:
         devanagari_font=family if script == "devanagari" else PRESETS["classic"].devanagari_font,
     )
     line = Line.from_text(SAMPLES[script], 0.0, 2.0)
-    ass = build_ass([line], 640, 120, base, hold=1.0, lead=0.0)
-    ok = _frame(ass, [family], 640, 120, 1.0, out, "0x1b2238")
+    ass = build_ass([line], BOX, BOX, base, hold=1.0, lead=0.0)
+    ok = _frame(ass, [family], BOX, BOX, 1.0, out, "0x1b2238")
     return out if ok else None
 
 
@@ -100,9 +101,9 @@ def preset_preview(key: str) -> Optional[Path]:
         return out
     line = Line.from_text(PRESET_SAMPLE, 1.0, 3.0)
     # bigger than in a real video so the style is easy to judge in a small thumbnail
-    big = dataclasses.replace(style, position="middle", size=min(0.30, style.size * 2.4))
-    ass = build_ass([line], 640, 220, big)
-    ok = _frame(ass, [style.latin_font, style.telugu_font, style.devanagari_font], 640, 220, 2.3, out, "0x232a40")
+    big = dataclasses.replace(style, position="middle", size=0.11)
+    ass = build_ass([line], BOX, BOX, big)
+    ok = _frame(ass, [style.latin_font, style.telugu_font, style.devanagari_font], BOX, BOX, 2.3, out, "0x232a40")
     return out if ok else None
 
 
@@ -111,3 +112,46 @@ def preset_gallery(workers: int = 4) -> List[Tuple[str, str, str]]:
     with ThreadPoolExecutor(max_workers=workers) as pool:
         paths = list(pool.map(preset_preview, PRESET_ORDER))
     return [(str(p), PRESETS[k].label, k) for p, k in zip(paths, PRESET_ORDER) if p]
+
+
+ANIM_SAMPLE = "Hello నమస్కారం"
+
+
+def animation_preview(entry: str) -> Optional[Path]:
+    """Small looping GIF showing the entry animation ``entry``; cached."""
+    from .presets import PRESETS as P
+
+    style, _ = fontlib.resolve_style_fonts(resolve_style(StyleOptions(preset="classic", animation=entry)))
+    stamp = ",".join(_font_stamp(f) for f in (style.latin_font, style.telugu_font, style.devanagari_font))
+    out = CACHE_DIR / ("anim_%s_%s.gif" % (entry, _key(repr(style), stamp)))
+    if out.exists():
+        return out
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    big = dataclasses.replace(style, position="middle", size=0.12)
+    ass = build_ass([Line.from_text(ANIM_SAMPLE, 0.2, 2.2)], BOX, BOX, big, hold=0.3)
+    work = Path(tempfile.mkdtemp(prefix="captioner_anim_"))
+    try:
+        fontlib.stage_fonts([style.latin_font, style.telugu_font, style.devanagari_font], work / "fonts")
+        (work / "fonts").mkdir(exist_ok=True)
+        (work / "c.ass").write_text(ass, encoding="utf-8")
+        vf = ("ass=c.ass:fontsdir=fonts,fps=15,split[a][b];[a]palettegen=reserve_transparent=0[p];"
+              "[b][p]paletteuse")
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+               "color=c=0x232a40:s=%dx%d:d=2.8:r=15" % (BOX, BOX), "-vf", vf, "-loop", "0", str(out)]
+        out.parent.mkdir(parents=True, exist_ok=True)
+        ok = subprocess.run(cmd, cwd=str(work), capture_output=True).returncode == 0 and out.exists()
+        return out if ok else None
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def animation_gallery(workers: int = 4) -> List[Tuple[str, str]]:
+    """[(gif path, entry name)] for every entry animation except 'none'."""
+    from .presets import ENTRIES
+
+    names = [e for e in ENTRIES if e != "none"]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        paths = list(pool.map(animation_preview, names))
+    return [(str(p), n) for p, n in zip(paths, names) if p]
